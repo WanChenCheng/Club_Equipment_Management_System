@@ -1,0 +1,217 @@
+<!-- ✅ check.html：歸還狀態檢查頁 -->
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>歸還狀態檢查</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- 側邊欄 -->
+    <aside class="sidebar">
+      <div class="logo">XXX 社</div>
+      <nav class="menu">
+        <a href="/member">成員管理</a>
+        <a href="/equipment-management">器材管理</a>
+        <a href="/clubRecord">借用紀錄</a>
+        <a href="/repair">設備報修</a>
+        <a href="/check" class="active">歸還狀態檢查</a>
+      </nav>
+    </aside>
+
+    <!-- 主內容 -->
+    <main class="main">
+      <div class="top-bar"></div>
+      <a href="/login" class="home-button">
+      </a>
+
+      <div class="content content-check">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="搜尋器材名稱" oninput="filterTable()" />
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>NO.</th>
+              <th>器材名稱</th>
+              <th>描述</th>
+              <th>歸還時間</th>
+              <th>狀態</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="check-table-body">
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- ✅ 檢查設備狀態 Modal -->
+  <div id="checkModal" class="calendar-modal">
+    <button class="modal-close" onclick="closeCheckModal()">✖</button>
+    <h2>檢查器材狀態</h2>
+    <div class="modal-content">
+      <div class="modal-row">
+        <label for="inspectionStatus">檢查狀態</label>
+        <select id="inspectionStatus">
+          <option value="normal">正常</option>
+          <option value="needs_repair">需要維修</option>
+          <option value="unusable">無法使用</option>
+        </select>
+      </div>
+      <div class="modal-row">
+        <label for="inspectionNotes">檢查備註</label>
+        <textarea id="inspectionNotes" rows="3" placeholder="請輸入檢查備註"></textarea>
+      </div>
+      <button class="brown-btn" onclick="completeInspection()">完成檢查</button>
+    </div>
+  </div>
+
+  <script>
+    let currentEquipmentId = null;
+
+    function filterTable() {
+      const input = document.getElementById("searchInput").value.toUpperCase();
+      const rows = document.querySelectorAll("#check-table-body tr");
+      rows.forEach(row => {
+        const cell = row.querySelector("td:nth-child(2)");
+        const match = cell.textContent.toUpperCase().includes(input);
+        row.style.display = match ? "" : "none";
+      });
+    }
+
+    function getPendingInspectionList() {
+      fetch('/equipment/pending-inspection')
+        .then(response => response.json())
+        .then(data => {
+          const tbody = document.getElementById('check-table-body');
+          tbody.innerHTML = '';
+          
+          data.forEach((equipment, index) => {
+            const row = document.createElement('tr');
+            
+            // 格式化日期
+            const returnTime = new Date(equipment.return_time).toLocaleString('zh-TW');
+            
+            row.innerHTML = `
+              <td>${index + 1}</td>
+              <td>${equipment.equipment_name}</td>
+              <td>${equipment.equipment_description || '-'}</td>
+              <td>${returnTime}</td>
+              <td><span class="tag warning">待檢查</span></td>
+              <td>
+                <button class="gray-btn" onclick="openCheckModal('${equipment.equipment_id}')">檢查</button>
+                <button class="brown-btn" onclick="setAvailable('${equipment.equipment_id}')" style="margin-left: 10px;">設為可用</button>
+              </td>
+            `;
+            
+            tbody.appendChild(row);
+          });
+        })
+        .catch(error => {
+          console.error('獲取待檢查器材失敗:', error);
+          alert('獲取待檢查器材失敗，請稍後再試');
+        });
+    }
+
+    function openCheckModal(equipmentId) {
+      currentEquipmentId = equipmentId;
+      document.getElementById('checkModal').classList.add('active');
+      document.getElementById('inspectionStatus').value = 'normal';
+      document.getElementById('inspectionNotes').value = '';
+    }
+
+    function closeCheckModal() {
+      document.getElementById('checkModal').classList.remove('active');
+      currentEquipmentId = null;
+    }
+
+    function completeInspection() {
+      if (!currentEquipmentId) return;
+
+      const status = document.getElementById('inspectionStatus').value;
+      const notes = document.getElementById('inspectionNotes').value.trim();
+
+      fetch('/inspection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipment_id: currentEquipmentId,
+          inspection_status: status,
+          inspection_notes: notes
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('新增檢查記錄失敗');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 更新器材狀態為可用
+        return fetch('/equipment/update-status', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            equipment_id: currentEquipmentId,
+            equipment_status: 'available'
+          })
+        });
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('更新器材狀態失敗');
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert('檢查完成！');
+        closeCheckModal();
+        getPendingInspectionList();
+      })
+      .catch(error => {
+        console.error('檢查過程發生錯誤:', error);
+        alert('檢查失敗，請稍後再試');
+      });
+    }
+
+    function setAvailable(equipmentId) {
+      if (!confirm('確定要將此器材設為可用狀態嗎？')) {
+        return;
+      }
+
+      fetch('/equipment/update-status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipment_id: equipmentId,
+          equipment_status: 'available'
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('更新器材狀態失敗');
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert('器材狀態已更新為可用！');
+        getPendingInspectionList();
+      })
+      .catch(error => {
+        console.error('更新器材狀態失敗:', error);
+        alert('更新器材狀態失敗，請稍後再試');
+      });
+    }
+
+    // 頁面加載時獲取待檢查器材列表
+    window.onload = function() {
+      getPendingInspectionList();
+    };
+  </script>
+</body>
+</html>

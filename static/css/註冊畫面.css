@@ -1,0 +1,55 @@
+/* ===== 基本設定 ===== */
+body {
+    margin: 0;
+    background-color: #F5EEDC;
+    font-family: 'Gabarito', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+  
+  /* ===== 卡片樣式 ===== */
+  .card {
+    background-color: white;
+    padding: 40px 32px;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    width: 400px;
+    text-align: center;
+  }
+  
+  /* ===== 標題 ===== */
+  .title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #4B3200;
+    margin-bottom: 32px;
+  }
+  
+  /* ===== 垂直按鈕群 ===== */
+  .button-group-vertical {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  
+  /* ===== 按鈕樣式 ===== */
+  .role-button {
+    background-color: #4B3200;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 24px;
+    width: 220px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .role-button:hover {
+    background-color: #3a2700;
+  }
+  

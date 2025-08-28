@@ -1,0 +1,254 @@
+<!-- ✅ member.html：成員管理頁 -->
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>成員管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- 側邊欄 -->
+    <aside class="sidebar">
+      <div class="logo">社團管理</div>
+      <nav class="menu">
+        <a href="/member" class="active">成員管理</a>
+        <a href="/equipment-management">器材管理</a>
+        <a href="/clubRecord">借用紀錄</a>
+        <a href="/repair">報修管理</a>
+        <a href="/check">歸還狀態檢查</a>
+      </nav>
+    </aside>
+
+    <!-- 主內容 -->
+    <main class="main">
+      <div class="top-bar"></div>
+      <a href="/login" class="home-button">
+      </a>
+      <div class="content content-member">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="搜尋成員" oninput="filterTable()" />
+          <button class="brown-btn" onclick="openAddModal()">新增成員</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Credit</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="member-table-body">
+            <!-- 成員資料將在這裡動態生成 -->
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- ✅ 新增成員彈窗 -->
+    <div id="addMemberModal" class="calendar-modal">
+      <button class="modal-close" onclick="closeAddModal()">✖</button>
+      <h2>新增成員</h2>
+      <div class="modal-field">
+        <input id="newUserName" type="text" placeholder="請輸入姓名" style="width: 90%; padding: 10px; border: 2px solid #5d4503; border-radius: 8px; margin: 10px 0;"/>
+      </div>
+      <div class="modal-field">
+        <input id="newUserEmail" type="email" placeholder="請輸入電子郵件" style="width: 90%; padding: 10px; border: 2px solid #5d4503; border-radius: 8px; margin: 10px 0;"/>
+      </div>
+      <div style="margin-top: 20px;">
+        <button class="brown-btn" onclick="addMember()">ADD</button>
+      </div>
+    </div>
+
+  <!-- ✅ 編輯信用分數彈窗 -->
+  <div id="editCreditModal" class="calendar-modal">
+    <button class="modal-close" onclick="closeEditCreditModal()">✖</button>
+    <h2>編輯信用分數</h2>
+    <div class="modal-field">
+      <input id="editCreditScore" type="number" placeholder="請輸入信用分數" style="width: 90%; padding: 10px; border: 2px solid #5d4503; border-radius: 8px; margin: 10px 0;"/>
+    </div>
+    <div style="margin-top: 20px;">
+      <button class="brown-btn" onclick="updateCredit()">更新</button>
+    </div>
+  </div>
+
+  <script>
+    // 獲取成員資料
+    async function getMembers() {
+      try {
+        const userData = await fetch("/user/member").then(res => res.json());
+        const tbody = document.getElementById('member-table-body');
+        tbody.innerHTML = '';
+
+        if (!userData || userData.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">暫無成員資料</td></tr>';
+          return;
+        }
+
+        userData.forEach((user, index) => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${user.user_id}</td>
+            <td>${user.user_name}</td>
+            <td>${user.email}</td>
+            <td>${user.credit_score || 0}</td>
+            <td>
+              <button class="gray-btn" onclick="editCredit(${user.user_id}, ${user.credit_score || 0})">編輯分數</button>
+              <button class="gray-btn" onclick="deleteMember(${user.user_id})">刪除</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('獲取成員資料失敗:', error);
+        const tbody = document.getElementById('member-table-body');
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align: center; color: red;">
+              獲取成員資料失敗: ${error.message}
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    // 搜尋功能
+    function filterTable() {
+      const input = document.getElementById("searchInput").value.toUpperCase();
+      const rows = document.querySelectorAll("#member-table-body tr");
+      rows.forEach(row => {
+        const cells = row.querySelectorAll("td");
+        let match = false;
+        cells.forEach(cell => {
+          if (cell.textContent.toUpperCase().includes(input)) {
+            match = true;
+          }
+        });
+        row.style.display = match ? "" : "none";
+      });
+    }
+
+    // 刪除成員
+    async function deleteMember(userId) {
+      if (!confirm('確定要刪除此成員嗎？')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/user/${userId}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          throw new Error('刪除失敗');
+        }
+
+        alert('刪除成功');
+        getMembers(); // 重新載入成員列表
+      } catch (error) {
+        console.error('刪除成員失敗:', error);
+        alert('刪除失敗: ' + error.message);
+      }
+    }
+
+    function openAddModal() {
+      document.getElementById("addMemberModal").classList.add("active");
+    }
+
+    function closeAddModal() {
+      document.getElementById("addMemberModal").classList.remove("active");
+      document.getElementById("newUserName").value = "";
+      document.getElementById("newUserEmail").value = "";
+    }
+
+    async function addMember() {
+      const userName = document.getElementById("newUserName").value.trim();
+      const userEmail = document.getElementById("newUserEmail").value.trim();
+
+      if (!userName) return alert("請輸入姓名");
+      if (!userEmail) return alert("請輸入電子郵件");
+
+      try {
+        const response = await fetch('/user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            user_name: userName,
+            email: userEmail,
+            password: '111',      // 設置默認密碼為 111
+            user_role: 'user'     // 設置為普通用戶
+          })
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error?.message || '新增成員失敗');
+        }
+
+        alert('新增成員成功');
+        closeAddModal();
+        getMembers(); // 重新載入成員列表
+      } catch (error) {
+        console.error('新增成員失敗:', error);
+        alert('新增成員失敗: ' + error.message);
+      }
+    }
+
+    let currentEditUserId = null;
+
+    function editCredit(userId, currentCredit) {
+      currentEditUserId = userId;
+      document.getElementById("editCreditScore").value = currentCredit;
+      document.getElementById("editCreditModal").classList.add("active");
+    }
+
+    function closeEditCreditModal() {
+      document.getElementById("editCreditModal").classList.remove("active");
+      currentEditUserId = null;
+      document.getElementById("editCreditScore").value = "";
+    }
+
+    async function updateCredit() {
+      if (!currentEditUserId) return;
+
+      const creditScore = parseInt(document.getElementById("editCreditScore").value);
+
+      if (isNaN(creditScore)) return alert("請輸入有效的信用分數");
+
+      try {
+        const response = await fetch(`/user/${currentEditUserId}/score`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            credit_score: creditScore
+          })
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error?.message || '更新信用分數失敗');
+        }
+
+        alert('更新信用分數成功');
+        closeEditCreditModal();
+        getMembers(); // 重新載入成員列表
+      } catch (error) {
+        console.error('更新信用分數失敗:', error);
+        alert('更新信用分數失敗: ' + error.message);
+      }
+    }
+
+    // 頁面載入時獲取成員資料
+    window.onload = getMembers;
+  </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+/* ===== 通用設定 ===== */
+body {
+  margin: 0;
+  background-color: #F5EEDC;
+  font-family: 'Gabarito', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* ===== 卡片樣式 ===== */
+.card {
+  background-color: white;
+  padding: 40px 32px;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  width: 400px;
+  max-width: 90vw;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+/* 可選：更小的卡片（首頁用） */
+.card.small {
+  width: 360px;
+}
+
+/* ===== 標題文字 ===== */
+h1,
+.title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #4B3200;
+  margin-bottom: 24px;
+}
+
+.subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4B3200;
+  margin-bottom: 24px;
+}
+
+/* ===== 按鈕樣式 ===== */
+.role-button,
+.submit-button {
+  background-color: #4B3200;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 20px;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  white-space: nowrap;
+  width: 200px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.role-button:hover,
+.submit-button:hover {
+  background-color: #3a2700;
+}
+
+/* ===== 首頁按鈕組（橫排） ===== */
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* ===== 註冊連結（例如「立即註冊」） ===== */
+.register-link {
+  color: #aaa;
+  font-size: 12px;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 12px;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+/* ===== 註冊表單樣式 ===== */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+}
+
+.form label {
+  color: #4B3200;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.form input {
+  padding: 8px;
+  font-size: 14px;
+  border: 2px solid #4B3200;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* ===== 註冊按鈕（Submit） ===== */
+.submit-button {
+  margin-top: 20px;
+  border-radius: 8px;
+  align-self: center;
+}

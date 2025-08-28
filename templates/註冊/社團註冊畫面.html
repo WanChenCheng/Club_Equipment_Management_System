@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>社團註冊</title>
+  <link href="https://fonts.googleapis.com/css2?family=Gabarito&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+  <div class="card">
+    <h1 class="title">社團帳號註冊</h1>
+    <form id="clubRegisterForm" class="form">
+      <label for="clubRegisterName">CLUB NAME</label>
+      <input type="text" id="clubRegisterName" name="clubRegisterName" required />
+
+      <label for="clubRegisterEmail">CLUB EMAIL</label>
+      <input type="email" id="clubRegisterEmail" name="clubRegisterEmail" required />
+
+      <label for="clubRegisterPassword">PASSWORD</label>
+      <input type="password" id="clubRegisterPassword" name="clubRegisterPassword" required />
+
+      <button type="submit" class="submit-button">REGISTER</button>
+    </form>
+    <a href="/clubLogin" class="login-link">已有帳號？立即登入</a>
+  </div>
+  <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>

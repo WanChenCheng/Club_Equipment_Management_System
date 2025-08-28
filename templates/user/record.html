@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>借用紀錄</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+</head>
+<body>
+  <div class="wrapper">
+    <aside class="sidebar">
+      <div class="logo">XXX社員</div>
+      <nav class="menu">
+        <a href="/loan">設備借用</a>
+        <a href="/userRecord" class="active">借用紀錄</a>
+      </nav>
+    </aside>
+
+    <main class="main">
+        <div class="top-bar"></div>
+        <a href="/login" class="home-button">
+        </a>
+        <div class="content content-check">
+            <!-- ✅ 顯示信用分數 -->
+            <div class="credit-box">
+                My CREDIT <span id="creditValue" class="credit-score">--</span>
+            </div>
+
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="搜尋器材" oninput="filterTable()" />
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>NO.</th>
+              <th>NAME</th>
+              <th>Description</th>
+              <th>Return Date</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="check-table-body">
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- ✅ 報修彈窗 -->
+  <div id="checkModal" class="calendar-modal">
+    <button class="modal-close" onclick="closeCheckModal()">✖</button>
+    <h2>報修器材</h2>
+    <div class="modal-section">
+      <p style="text-align: left;"><strong>Equipment ID</strong> <span id="modal-equipment-id">-</span></p>
+      <p style="text-align: left;"><strong>NAME</strong> <span id="modal-equipment-name">-</span></p>
+      <p style="text-align: left;"><strong>Description</strong></p>
+      <textarea id="modal-description" rows="4" class="modal-input" placeholder="請輸入報修描述"></textarea>
+    </div>
+    <div style="margin-top: 20px;">
+      <button class="brown-btn" onclick="applyRepair()">Apply</button>
+    </div>
+  </div>
+
+  <!-- ✅ 報修成功提示彈窗 -->
+  <div id="repairToast" class="toast-message">申請維修成功！</div>
+
+  <style>
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.9em;
+      font-weight: 500;
+    }
+    
+    .status-badge.borrowed {
+      background-color: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .status-badge.returned {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+  </style>
+
+  <script>
+    let selectedRow = null;
+    let currentRecordId = null;
+
+    // 獲取用戶的借用記錄
+    async function getUserRecords() {
+      try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+          throw new Error('請先登入');
+        }
+
+        const response = await fetch(`/record/user/${user.user_id}`);
+        if (!response.ok) {
+          throw new Error('獲取記錄失敗');
+        }
+
+        const records = await response.json();
+        const tbody = document.getElementById('check-table-body');
+        tbody.innerHTML = '';
+
+        if (!records || records.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">暫無借用記錄</td></tr>';
+          return;
+        }
+
+        records.forEach((record, index) => {
+          const row = document.createElement('tr');
+          const isReturned = record.end_date !== null;
+          
+          row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${record.equipment_name}</td>
+            <td>${record.equipment_description || '--- 描述 ---'}</td>
+            <td>${isReturned ? new Date(record.end_date).toLocaleDateString() : '未歸還'}</td>
+            <td>
+              <span class="status-badge ${isReturned ? 'returned' : 'borrowed'}">
+                ${isReturned ? '已歸還' : '借用中'}
+              </span>
+            </td>
+            <td>
+              ${!isReturned ? `
+                <button class="gray-btn" onclick="returnEquipment(${record.record_id})" style="margin-right: 5px;">
+                  歸還
+                </button>
+              ` : ''}
+              <button class="gray-btn" 
+                onclick="openCheckModal(this, ${record.record_id}, ${record.equipment_id})"
+                ${isReturned ? 'disabled' : ''}>
+                報修
+              </button>
+            </td>
+          `;
+          
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('獲取記錄失敗:', error);
+        const tbody = document.getElementById('check-table-body');
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; color: red;">
+              獲取記錄失敗: ${error.message}
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    function openCheckModal(button, recordId, equipmentId) {
+      currentRecordId = recordId;
+      selectedRow = button.closest('tr');
+      
+      // 獲取器材詳細信息
+      fetch(`/equipment/${equipmentId}`)
+        .then(response => response.json())
+        .then(equipment => {
+          document.getElementById('modal-equipment-id').textContent = equipment.equipment_id;
+          document.getElementById('modal-equipment-name').textContent = equipment.equipment_name;
+          document.getElementById('modal-description').value = '';
+          
+          document.getElementById('checkModal').classList.add('active');
+        })
+        .catch(error => {
+          console.error('獲取器材信息失敗:', error);
+          alert('獲取器材信息失敗，請稍後再試');
+        });
+    }
+
+    function closeCheckModal() {
+      document.getElementById('checkModal').classList.remove('active');
+      currentRecordId = null;
+      selectedRow = null;
+    }
+
+    async function applyRepair() {
+      if (!currentRecordId) {
+        alert('請選擇要報修的器材');
+        return;
+      }
+
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user) {
+        alert('請先登入！');
+        window.location.href = '/userLogin';
+        return;
+      }
+
+      const description = document.getElementById('modal-description').value;
+      if (!description.trim()) {
+        alert('請輸入報修描述');
+        return;
+      }
+
+      try {
+        const response = await fetch('/repair', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            equipment_id: document.getElementById('modal-equipment-id').textContent,
+            user_id: user.user_id,
+            report_notes: description,
+            repair_status: 'pending'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('報修申請失敗');
+        }
+
+        closeCheckModal();
+        showRepairToast();
+        // 重新載入記錄列表
+        getUserRecords();
+      } catch (error) {
+        console.error('報修申請失敗:', error);
+        alert('報修申請失敗，請稍後再試');
+      }
+    }
+
+    function showRepairToast() {
+      const toast = document.getElementById("repairToast");
+      toast.classList.add("active");
+      setTimeout(() => {
+        toast.classList.remove("active");
+      }, 2000);
+    }
+
+    function filterTable() {
+      const input = document.getElementById("searchInput").value.toUpperCase();
+      const rows = document.querySelectorAll("#check-table-body tr");
+      rows.forEach(row => {
+        const cell = row.querySelector("td:nth-child(2)");
+        const match = cell.textContent.toUpperCase().includes(input);
+        row.style.display = match ? "" : "none";
+      });
+    }
+
+    async function returnEquipment(recordId) {
+      try {
+        const response = await fetch(`/record/${recordId}/return`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('歸還失敗');
+        }
+
+        // 重新載入記錄列表
+        await getUserRecords();
+        alert('器材歸還成功！');
+      } catch (error) {
+        console.error('歸還失敗:', error);
+        alert('歸還失敗，請稍後再試');
+      }
+    }
+
+    // 初始化
+    window.onload = async function () {
+      try {
+        // 檢查用戶是否已登入
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+          alert('請先登入！');
+          window.location.href = '/userLogin';
+          return;
+        }
+
+        // 獲取使用者信用分數
+        const response = await fetch(`/user/${user.user_id}/score`);
+        if (!response.ok) {
+          throw new Error('獲取信用分數失敗');
+        }
+        const data = await response.json();
+        document.getElementById('creditValue').textContent = data.credit_score || '--';
+
+        // 獲取借用記錄
+        await getUserRecords();
+      } catch (err) {
+        console.error("初始化失敗:", err);
+        document.getElementById('creditValue').textContent = '--';
+        alert('初始化失敗，請重新整理頁面');
+      }
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>器材管理</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="wrapper">
+    <aside class="sidebar">
+      <div class="logo">XXX 社</div>
+      <nav class="menu">
+        <a href="/member">成員管理</a>
+        <a href="/equipment-management" class="active">器材管理</a>
+        <a href="/clubRecord">信用紀錄</a>
+        <a href="/repair">設備報修</a>
+        <a href="/check">歸還狀態檢查</a>
+      </nav>
+    </aside>
+
+    <!-- 主內容 -->
+    <main class="main">
+      <div class="top-bar"></div>
+      <a href="/login" class="home-button">
+      </a>
+      <div class="content content-equipment">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="搜尋器材 ID" oninput="filterTable()" />
+          <button class="brown-btn" onclick="openAddEquipmentModal()">新增器材</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>NO.</th>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Schedule</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="equipment-table-body">
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <div id="calendarModal" class="calendar-modal">
+    <button class="modal-close" onclick="closeCalendar()">✖</button>
+    <h2>借用時段</h2>
+    <div id="calendar"></div>
+    <p class="tag danger">紅色：借用中</p>
+    <p class="tag warning">橘色：報修</p>
+    <br />
+  </div>
+  <!-- ✅ 新增器材 Modal -->
+  <div id="addEquipmentModal" class="calendar-modal">
+    <button class="modal-close" onclick="closeAddEquipmentModal()">✖</button>
+    <h2>新增器材 </h2>
+    <div class="modal-row">
+      <label for="equipNameInput">NAME</label>
+      <input id="equipNameInput" type="text" placeholder="請輸入名稱" />
+    </div>
+    <div class="modal-row">
+      <label for="equipDescInput">Description</label>
+      <textarea id="equipDescInput" rows="3" placeholder="請輸入描述"></textarea>
+    </div>
+    <button class="brown-btn" onclick="addEquipment()">ADD</button>
+  </div>
+
+  <!-- ✅ 編輯器材 Modal -->
+  <div id="editEquipmentModal" class="calendar-modal">
+    <button class="modal-close" onclick="closeEditEquipmentModal()">✖</button>
+    <h2>編輯器材</h2>
+    <div class="modal-row">
+      <label for="editEquipNameInput">NAME</label>
+      <input id="editEquipNameInput" type="text" placeholder="請輸入名稱" />
+    </div>
+    <div class="modal-row">
+      <label for="editEquipDescInput">Description</label>
+      <textarea id="editEquipDescInput" rows="3" placeholder="請輸入描述"></textarea>
+    </div>
+    <div class="modal-row">
+      <label for="editEquipStatusInput">Status</label>
+      <select id="editEquipStatusInput">
+        <option value="available">可借用</option>
+        <option value="repairing">維修中</option>
+      </select>
+    </div>
+    <button class="brown-btn" onclick="updateEquipment()">更新</button>
+  </div>
+
+  <!-- calendar -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script>
+    function deleteRow(button) {
+      const row = button.closest('tr');
+      row.remove();
+    }
+
+    function filterTable() {
+      const input = document.getElementById("searchInput").value.toUpperCase();
+      const rows = document.querySelectorAll("#equipment-table-body tr");
+      rows.forEach(row => {
+        const cell = row.querySelector("td:nth-child(2)");
+        const match = cell.textContent.toUpperCase().includes(input);
+        row.style.display = match ? "" : "none";
+      });
+    }
+
+    function openCalendar(equipmentId) {
+      const modal = document.getElementById("calendarModal");
+      modal.classList.add("active");
+
+      // 獲取器材的借用記錄
+      fetch(`/record/equipment/${equipmentId}`)
+        .then(response => response.json())
+        .then(records => {
+          // 獲取器材的報修記錄
+          return fetch(`/repair/${equipmentId}`)
+            .then(response => response.json())
+            .then(repairs => {
+              const calendarEl = document.getElementById("calendar");
+              calendarEl.innerHTML = "";
+              
+              // 準備日曆事件數據
+              const events = [];
+              
+              // 添加借用記錄
+              records.forEach(record => {
+                if (record.start_date) {
+                  const startDate = record.start_date.split(' ')[0]; // 只取日期部分
+                  const endDate = record.end_date ? record.end_date.split(' ')[0] : null;
+                  
+                  events.push({
+                    title: '借用',
+                    start: startDate,
+                    end: endDate,
+                    color: '#d97b7b',
+                    display: 'block'
+                  });
+                }
+              });
+              
+              // 添加報修記錄
+              repairs.forEach(repair => {
+                if (repair.report_time) {
+                  const reportDate = repair.report_time.split(' ')[0]; // 只取日期部分
+                  
+                  events.push({
+                    title: '報修',
+                    start: reportDate,
+                    color: '#e6c146',
+                    display: 'block'
+                  });
+                }
+              });
+
+              // 創建日曆
+              const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 400,
+                events: events,
+                locale: 'zh-tw',
+                headerToolbar: {
+                  left: 'prev,next today',
+                  center: 'title',
+                  right: 'dayGridMonth,dayGridWeek'
+                },
+                eventDisplay: 'block',
+                eventTimeFormat: {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                }
+              });
+              calendar.render();
+            });
+        })
+        .catch(error => {
+          console.error('獲取記錄失敗:', error);
+          alert('獲取記錄失敗，請稍後再試');
+        });
+    }
+
+    function closeCalendar() {
+      document.getElementById("calendarModal").classList.remove("active");
+    }
+    //新增器材
+    function openAddEquipmentModal() {
+      document.getElementById("addEquipmentModal").classList.add("active");
+    }
+
+    function closeAddEquipmentModal() {
+      document.getElementById("addEquipmentModal").classList.remove("active");
+      document.getElementById("equipIdInput").value = "";
+      document.getElementById("equipNameInput").value = "";
+      document.getElementById("equipDescInput").value = "";
+    }
+
+    function addEquipment() {
+      const name = document.getElementById("equipNameInput").value.trim();
+      const desc = document.getElementById("equipDescInput").value.trim();
+      
+      if (!name) {
+        alert("器材名稱為必填");
+        return;
+      }
+
+      // 發送請求到後端
+      fetch('/equipment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipment_name: name,
+          equipment_description: desc,
+          equipment_status: 'available'
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => {
+            throw new Error(data.error?.message || '新增器材失敗');
+          });
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 新增成功後重新獲取器材列表
+        getEquipmentList();
+        // 關閉 modal
+        closeAddEquipmentModal();
+        // 顯示成功訊息
+        alert('新增器材成功！');
+      })
+      .catch(error => {
+        console.error('新增器材錯誤:', error);
+        alert(error.message || '新增器材失敗，請稍後再試');
+      });
+    }
+
+    let currentEditEquipmentId = null;
+
+    function editEquipment(equipmentId, name, description, status) {
+      currentEditEquipmentId = equipmentId;
+      document.getElementById("editEquipNameInput").value = name;
+      document.getElementById("editEquipDescInput").value = description || '';
+      
+      // 如果狀態是 'borrowed'，則設置為 'available'
+      const statusSelect = document.getElementById("editEquipStatusInput");
+      statusSelect.value = status === 'borrowed' ? 'available' : status;
+      
+      document.getElementById("editEquipmentModal").classList.add("active");
+    }
+
+    function closeEditEquipmentModal() {
+      document.getElementById("editEquipmentModal").classList.remove("active");
+      currentEditEquipmentId = null;
+      document.getElementById("editEquipNameInput").value = "";
+      document.getElementById("editEquipDescInput").value = "";
+      document.getElementById("editEquipStatusInput").value = "available";
+    }
+
+    function updateEquipment() {
+      if (!currentEditEquipmentId) return;
+
+      const name = document.getElementById("editEquipNameInput").value.trim();
+      const desc = document.getElementById("editEquipDescInput").value.trim();
+      const status = document.getElementById("editEquipStatusInput").value;
+      
+      if (!name) {
+        alert("器材名稱為必填");
+        return;
+      }
+
+      // 檢查是否正在借用中
+      fetch(`/equipment/${currentEditEquipmentId}/status`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.equipment_status === 'borrowed') {
+            alert("器材正在借用中，無法更改狀態");
+            return;
+          }
+
+          // 如果沒有被借用，則可以更新
+          fetch(`/equipment/${currentEditEquipmentId}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              equipment_name: name,
+              equipment_description: desc,
+              equipment_status: status
+            })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('更新器材失敗');
+            }
+            return response.json();
+          })
+          .then(data => {
+            getEquipmentList();
+            closeEditEquipmentModal();
+            alert('更新器材成功！');
+          })
+          .catch(error => {
+            console.error('更新器材錯誤:', error);
+            alert('更新器材失敗，請稍後再試');
+          });
+        })
+        .catch(error => {
+          console.error('檢查器材狀態失敗:', error);
+          alert('檢查器材狀態失敗，請稍後再試');
+        });
+    }
+
+    // 獲取器材列表的函數
+    function getEquipmentList() {
+      fetch('/equipment')
+        .then(response => response.json())
+        .then(data => {
+          const tbody = document.getElementById('equipment-table-body');
+          tbody.innerHTML = '';
+          
+          data.forEach((equipment, index) => {
+            const row = document.createElement('tr');
+            
+            // 設置狀態樣式
+            let statusClass = '';
+            let statusText = '';
+            
+            switch(equipment.equipment_status) {
+                case 'available':
+                    statusClass = 'success';
+                    statusText = '可借用';
+                    break;
+                case 'borrowed':
+                    statusClass = 'danger';
+                    statusText = '已借出';
+                    break;
+                case 'repairing':
+                    statusClass = 'warning';
+                    statusText = '維修中';
+                    break;
+                case 'pending_inspection':
+                    statusClass = 'warning';
+                    statusText = '檢查中';
+                    break;
+                default:
+                    statusClass = 'danger';
+                    statusText = '無法使用';
+            }
+
+            row.innerHTML = `
+              <td>${equipment.equipment_id}</td>
+              <td>${equipment.equipment_name}</td>
+              <td>${equipment.equipment_description || '---'}</td>
+              <td><span class="tag ${statusClass}">${statusText}</span></td>
+              <td><button class="gray-btn" onclick="openCalendar('${equipment.equipment_id}')">查看</button></td>
+              <td>
+                <button class="gray-btn" onclick="editEquipment('${equipment.equipment_id}', '${equipment.equipment_name}', '${equipment.equipment_description || ''}', '${equipment.equipment_status}')">編輯</button>
+                <button class="delete-btn" onclick="deleteEquipment('${equipment.equipment_id}')">✖</button>
+              </td>
+            `;
+            
+            tbody.appendChild(row);
+          });
+        })
+        .catch(error => {
+          console.error('獲取器材列表失敗:', error);
+          alert('獲取器材列表失敗，請稍後再試');
+        });
+    }
+
+    // 刪除器材的函數
+    function deleteEquipment(equipmentId) {
+      if (!confirm('確定要刪除此器材嗎？')) {
+        return;
+      }
+
+      fetch(`/equipment/${equipmentId}`, {
+        method: 'DELETE'
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('刪除器材失敗');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 刪除成功後重新獲取器材列表
+        getEquipmentList();
+        alert('刪除器材成功！');
+      })
+      .catch(error => {
+        console.error('刪除器材錯誤:', error);
+        alert('刪除器材失敗，請稍後再試');
+      });
+    }
+
+    // 頁面加載時獲取器材列表
+    window.onload = function() {
+      getEquipmentList();
+    };
+
+  </script>
+</body>
+</html>

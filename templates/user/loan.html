@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>設備借用</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+</head>
+<body>
+
+<div class="wrapper">
+  <!-- 側邊欄 -->
+  <aside class="sidebar">
+    <div class="logo">XXX社員</div>
+    <nav class="menu">
+      <a href="/loan" class="active">設備借用</a>
+      <a href="/userRecord">借用紀錄</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="top-bar"></div>
+    <a href="/login" class="home-button">
+    </a>
+    <div class="content content-equipment">
+      <!-- ✅ 顯示信用分數 -->
+      <div class="credit-box">
+          My CREDIT <span id="creditValue" class="credit-score">--</span>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="搜尋器材" oninput="filterTable()" />
+      </div>
+
+      <table>
+        <thead>
+        <tr>
+            <th>NO.</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Loan</th>
+        </tr>
+        </thead>
+        <tbody id="equipment-table-body">
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- 📅 日曆 Modal -->
+<div id="calendarModal" class="calendar-modal">
+  <button class="modal-close" onclick="closeCalendar()">✖</button>
+  <h2>借用時段</h2>
+  <div id="calendar"></div>
+  <p class="tag" style="background-color: #777;">深灰：借出/維修中</p>
+  <br />
+  <button class="brown-btn" onclick="confirmBooking()">預約</button>
+</div>
+
+<!-- ✅ 成功提示 -->
+<div id="successPopup" class="toast-message">恭喜你！預約成功！</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script>
+  let calendar;
+  let selectedRange = null;
+  let currentBookingEvent = null;
+  let currentEquipmentId = null;
+
+  function getEquipment() {
+    fetch('/equipment')
+      .then(response => {
+        // 檢查響應狀態
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        // 檢查響應類型
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new TypeError("返回的數據不是 JSON 格式!");
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log('獲取到的器材數據:', data);
+        const tbody = document.getElementById('equipment-table-body');
+        tbody.innerHTML = '';
+        
+        if (!data || data.length === 0) {
+          console.log('沒有器材數據');
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">暫無器材數據</td></tr>';
+          return;
+        }
+        
+        data.forEach((equipment, index) => {
+          console.log('處理器材:', equipment);
+          const row = document.createElement('tr');
+          
+          // 設置狀態樣式
+          let statusClass = '';
+          let statusText = '';
+          
+          switch(equipment.equipment_status) {
+            case 'available':
+              statusClass = 'success';
+              statusText = '可借用';
+              break;
+            case 'borrowed':
+              statusClass = 'danger';
+              statusText = '已借出';
+              break;
+            case 'repairing':
+              statusClass = 'warning';
+              statusText = '維修中';
+              break;
+            case 'pending_inspection':
+              statusClass = 'warning';
+              statusText = '檢查中';
+              break;
+            default:
+              statusClass = 'danger';
+              statusText = '無法使用';
+          }
+
+          row.innerHTML = `
+            <td>${equipment.equipment_id}</td>
+            <td>${equipment.equipment_name}</td>
+            <td>${equipment.equipment_description || '--- 描述 ---'}</td>
+            <td><span class="tag ${statusClass}">${statusText}</span></td>
+            <td>
+              <button class="gray-btn" 
+                onclick="openCalendar('${equipment.equipment_id}')"
+                ${equipment.equipment_status !== 'available' ? 'disabled' : ''}>
+                查看
+              </button>
+            </td>
+          `;
+          
+          tbody.appendChild(row);
+        });
+      })
+      .catch(error => {
+        console.error('獲取器材列表失敗:', error);
+        const tbody = document.getElementById('equipment-table-body');
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align: center; color: red;">
+              獲取器材列表失敗: ${error.message}
+            </td>
+          </tr>
+        `;
+      });
+  }
+
+  function filterTable() {
+    const input = document.getElementById("searchInput").value.toUpperCase();
+    const rows = document.querySelectorAll("#equipment-table-body tr");
+    rows.forEach(row => {
+      const cell = row.querySelector("td:nth-child(2)");
+      const match = cell.textContent.toUpperCase().includes(input);
+      row.style.display = match ? "" : "none";
+    });
+  }
+
+  function openCalendar(equipmentId) {
+    currentEquipmentId = equipmentId;
+
+    // 模擬不可借用的時段（borrowed, repair）
+    const unavailable = [
+      { title: '不可選', start: '2025-06-05', end: '2025-06-08', color: '#777' },
+      { title: '不可選', start: '2025-06-09', end: '2025-06-15', color: '#777' }
+    ];
+
+    // 模擬使用者自己已預約的時段
+    // TODO: 後端應回傳 is_owner 屬性
+    const ownBooking = currentBookingEvent
+      ? [currentBookingEvent]
+      : [];
+
+    document.getElementById("calendarModal").classList.add("active");
+
+    setTimeout(() => {
+      const calendarEl = document.getElementById("calendar");
+      calendarEl.innerHTML = "";
+
+      calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        height: 400,
+        selectable: true,
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth'
+        },
+        titleFormat: { year: 'numeric', month: 'long' },
+        buttonText: {
+          today: '今天'
+        },
+
+        // ✅ 可選擇區段
+        select(info) {
+          const conflict = calendar.getEvents().some(ev => {
+            return ev.title === '不可選' && info.start < ev.end && info.end > ev.start;
+          });
+          if (conflict) {
+            alert("選取區段包含不可借用日期，請重新選擇！");
+            return;
+          }
+
+          selectedRange = info;
+
+          // 清除原有選擇提示
+          calendar.getEvents().forEach(ev => {
+            if (ev.title === '選擇中') ev.remove();
+          });
+
+          // 顯示新選擇
+          calendar.addEvent({
+            title: '選擇中',
+            start: info.startStr,
+            end: info.endStr,
+            color: '#6bb46a'
+          });
+        },
+
+        // ✅ 點擊自己的預約 → 可取消
+        eventClick(info) {
+          if (info.event.id === 'booking') {
+            info.event.remove();
+            currentBookingEvent = null;
+            selectedRange = null;
+          }
+        },
+
+        events: unavailable.concat(ownBooking)
+      });
+
+      calendar.render();
+    }, 100);
+  }
+
+  function closeCalendar() {
+    document.getElementById("calendarModal").classList.remove("active");
+  }
+
+  function confirmBooking() {
+    if (!selectedRange) {
+      alert('請選擇借用時段');
+      return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user) {
+      alert('請先登入！');
+      window.location.href = '/userLogin';
+      return;
+    }
+
+    // 格式化日期為 YYYY-MM-DD
+    const startDate = selectedRange.start.toISOString().split('T')[0];
+    // 將結束日期減去一天，因為 FullCalendar 的 end 是排他性的
+    const endDate = new Date(selectedRange.end);
+    endDate.setDate(endDate.getDate() - 1);
+    const formattedEndDate = endDate.toISOString().split('T')[0];
+
+    console.log('發送預約請求:', {
+      user_id: user.user_id,
+      equipment_id: currentEquipmentId,
+      start_date: startDate,
+      end_date: formattedEndDate
+    });
+
+    // 發送借用記錄到後端
+    fetch('/record', {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_id: user.user_id,
+        equipment_id: currentEquipmentId,
+        start_date: startDate,
+        end_date: formattedEndDate
+      })
+    })
+    .then(async response => {
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || '預約失敗');
+      }
+      return data;
+    })
+    .then(data => {
+      // 清除狀態
+      selectedRange = null;
+      
+      // 顯示成功訊息
+      const popup = document.getElementById("successPopup");
+      popup.textContent = data.is_immediate ? '借用成功！' : '預約成功！';
+      popup.classList.add("active");
+      
+      setTimeout(() => {
+        popup.classList.remove("active");
+        // 關閉日曆視窗
+        closeCalendar();
+        // 重新載入器材列表
+        getEquipment();
+      }, 1000);
+    })
+    .catch(error => {
+      console.error('預約錯誤:', error);
+      alert(error.message || '預約失敗，請稍後再試');
+      // 移除預約事件
+      calendar.getEvents().forEach(ev => {
+        if (ev.id === 'booking') ev.remove();
+      });
+      currentBookingEvent = null;
+    });
+  }
+  // ✅ 初始化時撈取 CREDIT 分數
+  window.onload = async function () {
+    try {
+      // 檢查用戶是否已登入
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user) {
+        alert('請先登入！');
+        window.location.href = '/userLogin';
+        return;
+      }
+
+      // 獲取使用者信用分數
+      const response = await fetch(`/user/${user.user_id}/score`);
+      if (!response.ok) {
+        throw new Error('獲取信用分數失敗');
+      }
+      const data = await response.json();
+      document.getElementById('creditValue').textContent = data.credit_score || '--';
+
+      // 獲取器材列表
+      getEquipment();
+    } catch (err) {
+      console.error("初始化失敗:", err);
+      document.getElementById('creditValue').textContent = '--';
+      alert('初始化失敗，請重新整理頁面');
+    }
+  };
+</script>
+</body>
+</html>
+

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>使用者登入</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/登入.css') }}" />
+</head>
+<body>
+  <div class="login-container">
+    <h2 class="title-ch">使用者登入</h2>
+    <h3 class="title-en">User Login</h3>
+    
+    <form id="userLoginForm" class="login-form">
+      <label for="userLoginEmail">USER EMAIL</label>
+      <input type="email" id="userLoginEmail" name="userLoginEmail" required />
+
+      <label for="userLoginPassword">PASSWORD</label>
+      <input type="password" id="userLoginPassword" name="userLoginPassword" required />
+
+      <button type="submit" class="submit-button">LOGIN</button>
+    </form>
+    
+    <a href="/register" class="register-link">還沒有帳號？立即註冊</a>
+  </div>
+  <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>

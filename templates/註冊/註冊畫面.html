@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>註冊畫面</title>
+  <link href="https://fonts.googleapis.com/css2?family=Gabarito&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/註冊畫面.css') }}">
+</head>
+<body>
+  <div class="card">
+    <h1 class="title">註冊你的社團或是個人帳號！</h1>
+    <div class="button-group-vertical">
+        <button class="role-button" onclick="location.href='/clubRegister'">註冊社團帳號</button>
+        <button class="role-button" onclick="location.href='/userRegister'">註冊個人帳號</button>        
+    </div>
+  </div>
+</body>
+</html>

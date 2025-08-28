@@ -1,0 +1,234 @@
+<!-- ✅ check.html：歸還狀態檢查頁 -->
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>設備報修</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- 側邊欄 -->
+    <aside class="sidebar">
+      <div class="logo">XXX 社</div>
+      <nav class="menu">
+        <a href="/member">成員管理</a>
+        <a href="/equipment-management">器材管理</a>
+        <a href="/clubRecord">借用紀錄</a>
+        <a href="/repair" class="active">設備報修</a>
+        <a href="/check">歸還狀態檢查</a>
+      </nav>
+    </aside>
+
+    <!-- 主內容 -->
+    <main class="main">
+      <div class="top-bar"></div>
+      <a href="/login" class="home-button">
+      </a>
+      <div class="content content-repair">
+        <div class="search-bar">
+          <input type="text" id="searchInput" placeholder="搜尋器材名稱" oninput="filterTable()" />
+          <select id="statusFilter" onchange="filterTable()">
+            <option value="all">所有狀態</option>
+            <option value="pending">待處理</option>
+            <option value="processing">處理中</option>
+            <option value="completed">已完成</option>
+          </select>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>NO.</th>
+              <th>器材名稱</th>
+              <th>報修時間</th>
+              <th>報修原因</th>
+              <th>報修者</th>
+              <th>狀態</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="repair-table-body">
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- 移除檢查記錄 Modal -->
+  <script>
+    let currentEquipmentId = null;
+
+    function filterTable() {
+      const searchInput = document.getElementById("searchInput").value.toUpperCase();
+      const statusFilter = document.getElementById("statusFilter").value;
+      const rows = document.querySelectorAll("#repair-table-body tr");
+
+      rows.forEach(row => {
+        const nameCell = row.querySelector("td:nth-child(2)");
+        const statusCell = row.querySelector("td:nth-child(6)");
+        const nameMatch = nameCell.textContent.toUpperCase().includes(searchInput);
+        const statusMatch = statusFilter === 'all' || statusCell.textContent.includes(statusFilter);
+        row.style.display = nameMatch && statusMatch ? "" : "none";
+      });
+    }
+
+    function getRepairList() {
+      fetch('/repair/all')
+        .then(response => response.json())
+        .then(data => {
+          const tbody = document.getElementById('repair-table-body');
+          tbody.innerHTML = '';
+          
+          data.forEach((equipment, index) => {
+            const row = document.createElement('tr');
+            
+            // 格式化日期
+            const reportTime = equipment.report_time || '無報修記錄';
+            const lastInspectionTime = equipment.last_inspection_time || '未檢查';
+            
+            // 設置狀態樣式
+            let statusClass = '';
+            let statusText = '';
+            
+            // 根據器材的檢查狀態顯示
+            if (!equipment.inspection_status) {
+                statusClass = 'warning';
+                statusText = '未檢查';
+            } else {
+                switch(equipment.inspection_status) {
+                    case 'normal':
+                        statusClass = 'success';
+                        statusText = '正常';
+                        break;
+                    case 'needs_repair':
+                        statusClass = 'warning';
+                        statusText = '需要維修';
+                        break;
+                    case 'unusable':
+                        statusClass = 'danger';
+                        statusText = '無法使用';
+                        break;
+                }
+            }
+
+            row.innerHTML = `
+              <td>${index + 1}</td>
+              <td>${equipment.equipment_name}</td>
+              <td>${lastInspectionTime}</td>
+              <td>${equipment.report_notes || '-'}</td>
+              <td>${equipment.user_name || '-'}</td>
+              <td><span class="tag ${statusClass}">${statusText}</span></td>
+              <td>
+                <div class="button-group">
+                  <button class="brown-btn" onclick="updateRepairStatus('${equipment.equipment_id}', '${equipment.report_time}')">更新狀態</button>
+                </div>
+              </td>
+            `;
+            
+            tbody.appendChild(row);
+          });
+        })
+        .catch(error => {
+          console.error('獲取器材記錄失敗:', error);
+          alert('獲取器材記錄失敗，請稍後再試');
+        });
+    }
+
+    function updateRepairStatus(equipmentId, reportTime) {
+      // 創建一個簡單的模態框來選擇狀態
+      const modal = document.createElement('div');
+      modal.className = 'calendar-modal active';
+      modal.innerHTML = `
+        <button class="modal-close" onclick="this.parentElement.remove()">✖</button>
+        <h2>更新器材狀態</h2>
+        <div class="modal-content">
+          <div class="modal-row">
+            <label for="newStatus">選擇狀態</label>
+            <select id="newStatus">
+              <option value="normal">正常</option>
+              <option value="needs_repair">需要維修</option>
+              <option value="unusable">無法使用</option>
+            </select>
+          </div>
+          <div class="modal-row">
+            <label for="statusNotes">備註</label>
+            <textarea id="statusNotes" rows="3" placeholder="請輸入狀態更新備註"></textarea>
+          </div>
+          <button class="brown-btn" onclick="confirmStatusUpdate('${equipmentId}', '${reportTime}')">確認更新</button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    function confirmStatusUpdate(equipmentId, reportTime) {
+      const newStatus = document.getElementById('newStatus').value;
+      const notes = document.getElementById('statusNotes').value.trim();
+
+      // 先更新檢查狀態
+      fetch('/inspection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          equipment_id: equipmentId,
+          inspection_status: newStatus,
+          inspection_notes: notes
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('更新檢查狀態失敗');
+        }
+        return response.json();
+      })
+      .then(data => {
+        // 如果狀態是正常，則更新器材狀態為可用
+        if (newStatus === 'normal') {
+          return fetch('/equipment/update-status', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              equipment_id: equipmentId,
+              equipment_status: 'available'
+            })
+          });
+        }
+        // 如果狀態是需要維修或無法使用，則更新器材狀態為維修中
+        else {
+          return fetch('/equipment/update-status', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              equipment_id: equipmentId,
+              equipment_status: 'repairing'
+            })
+          });
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('更新器材狀態失敗');
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert('狀態更新成功！');
+        // 移除模態框
+        document.querySelector('.calendar-modal.active').remove();
+        // 刷新列表
+        getRepairList();
+      })
+      .catch(error => {
+        console.error('更新狀態錯誤:', error);
+        alert('更新狀態失敗，請稍後再試');
+      });
+    }
+
+    // 頁面加載時獲取報修記錄
+    window.onload = function() {
+      getRepairList();
+    };
+  </script>
+</body>
+</html>

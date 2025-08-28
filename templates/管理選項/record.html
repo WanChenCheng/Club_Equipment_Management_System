@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>借用紀錄</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+  <div class="wrapper">
+    <!-- 側邊欄 -->
+    <aside class="sidebar">
+      <div class="logo">XXX 社</div>
+      <nav class="menu">
+        <a href="/member">成員管理</a>
+        <a href="/equipment-management">器材管理</a>
+        <a href="/clubRecord" class="active">借用紀錄</a>
+        <a href="/repair">設備報修</a>
+        <a href="/check">歸還狀態檢查</a>
+      </nav>
+    </aside>
+
+    <!-- 主內容 -->
+    <main class="main">
+      <div class="top-bar"></div>
+      <a href="/login" class="home-button">
+      </a>
+      <div class="content content-record">
+        <div class="search-bar">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="搜尋器材名稱"
+            oninput="filterTable()"
+          />
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>NO.</th>
+              <th>器材名稱</th>
+              <th>借用者</th>
+              <th>借用時間</th>
+              <th>歸還時間</th>
+              <th>狀態</th>
+            </tr>
+          </thead>
+          <tbody id="record-table-body">
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function filterTable() {
+      const input = document.getElementById("searchInput").value.toUpperCase();
+      const rows = document.querySelectorAll("#record-table-body tr");
+      rows.forEach(row => {
+        const cell = row.querySelector("td:nth-child(2)"); // 搜尋器材名稱欄位
+        const match = cell.textContent.toUpperCase().includes(input);
+        row.style.display = match ? "" : "none";
+      });
+    }
+
+    function getRecordList() {
+      fetch('/record/all')
+        .then(response => response.json())
+        .then(data => {
+          const tbody = document.getElementById('record-table-body');
+          tbody.innerHTML = '';
+          
+          data.forEach((record, index) => {
+            const row = document.createElement('tr');
+            
+            // 格式化日期
+            const startDate = new Date(record.start_date).toLocaleString('zh-TW');
+            const endDate = record.end_date ? new Date(record.end_date).toLocaleString('zh-TW') : '未歸還';
+            
+            // 設置狀態
+            let statusClass = '';
+            let statusText = '';
+            if (record.end_date) {
+              statusClass = 'success';
+              statusText = '已歸還';
+            } else {
+              statusClass = 'danger';
+              statusText = '借用中';
+            }
+
+            row.innerHTML = `
+              <td>${index + 1}</td>
+              <td>${record.equipment_name}</td>
+              <td>${record.user_name}</td>
+              <td>${startDate}</td>
+              <td>${endDate}</td>
+              <td><span class="tag ${statusClass}">${statusText}</span></td>
+            `;
+            
+            tbody.appendChild(row);
+          });
+        })
+        .catch(error => {
+          console.error('獲取借用記錄失敗:', error);
+          alert('獲取借用記錄失敗，請稍後再試');
+        });
+    }
+
+    // 頁面加載時獲取借用記錄
+    window.onload = function() {
+      getRecordList();
+    };
+  </script>
+</body>
+</html>

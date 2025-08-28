@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>社團器材管理系統</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Gabarito&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="card">
+    <h1>社團器材管理租借系統</h1>
+    <p class="subtitle">Campus Club Equipment Rental System</p>
+    <div class="button-group">
+      <button class="role-button" onclick="location.href='/clubLogin'">社團管理者</button>
+      <button class="role-button" onclick="location.href='/userLogin'">器材借用者</button>
+    </div>
+    <a href="/register" class="register-link">立即註冊</a>
+  </div>
+</body>
+</html>

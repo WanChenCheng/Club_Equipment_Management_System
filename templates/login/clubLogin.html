@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>社團登入</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/登入.css') }}" />
+</head>
+<body>
+  <div class="login-container">
+    <h2 class="title-ch">社團登入</h2>
+    <h3 class="title-en">Club Login</h3>
+    
+    <form id="clubLoginForm" class="login-form">
+      <label for="clubLoginEmail">CLUB EMAIL</label>
+      <input type="email" id="clubLoginEmail" name="clubLoginEmail" required />
+
+      <label for="clubLoginPassword">PASSWORD</label>
+      <input type="password" id="clubLoginPassword" name="clubLoginPassword" required />
+
+      <button type="submit" class="submit-button">LOGIN</button>
+    </form>
+    
+    <a href="/register" class="register-link">還沒有帳號？立即註冊</a>
+  </div>
+  <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+</html>
